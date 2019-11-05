@@ -4,13 +4,12 @@ Created on Mon Nov  4 11:10:31 2019
 
 @author: 18479
 """
-
 import requests
 import pandas as pd
 import numpy as np
 import json
 ## Two functions to pull in census tract data
-def api_pull_censustractID():
+def api_pull_censustractID(writer=True):
     api_pull_censustractID.ftract={}
     if not api_pull_censustractID.ftract:
         for x in range(81):
@@ -18,8 +17,11 @@ def api_pull_censustractID():
             response=requests.get(url)
             r=response.json()
             for dat in r['features']:
-                api_pull_censustractID.ftract[dat['properties']['tract']]=str(dat['id'])
+                api_pull_censustractID.ftract[str(dat['properties']['tract'])]=str(dat['id'])
         api_pull_censustractID.hbr=True
+        if writer:
+            with open('caladapt_census_tracts_dict_ID.txt', 'w') as file:
+                file.write(json.dumps(api_pull_censustractID.ftract))
     return api_pull_censustractID.ftract
 def load_fromfile_censustractID():
     with open('caladapt_census_tracts_dict_ID.txt', 'r') as file:
@@ -27,34 +29,47 @@ def load_fromfile_censustractID():
     load_fromfile_censustractID.ftract=data
     load_fromfile_censustractID.hbr=True
     return load_fromfile_censustractID.ftract
-##saves the census tracts as a file
-def write_censustractID():
-    if api_pull_censustractID.hbr:
-        ftract=api_pull_censustractID.ftract
-    else:
-        ftract=api_pull_censustractID()
-    with open('caladapt_census_tracts_dict_ID.txt', 'w') as file:
-         file.write(json.dumps(ftract))
          
-##find daily model names
-url="https://api.cal-adapt.org/api/series/?pagesize=501"
-response=requests.get(url)
-r=response.json()
-fmodel={}
-for dat in r['results']:
-    fmodel[dat['name']]=dat['slug']
-with open('caladapt_types.txt', 'w') as file:
-    file.write(json.dumps(fmodel))
+## Two functions to pull in model names
+def api_pull_modelslugs(writer=True): 
+    api_pull_censustractID.fmodel={}
+    if not api_pull_censustractID.fmodel:
+        url="https://api.cal-adapt.org/api/series/?pagesize=501"
+        response=requests.get(url)
+        r=response.json()
+        for dat in r['results']:
+            api_pull_censustractID.fmodel[dat['name']]=dat['slug']
+            api_pull_censustractID.hbr=True 
+        api_pull_modelslugs.hbr=True
+        if writer:
+            with open('caladapt_types.txt', 'w') as file:
+                file.write(json.dumps(api_pull_censustractID.fmodel))
+    return api_pull_censustractID.fmodel
+def load_fromfile_modelslugs():
+    with open('caladapt_census_tracts_dict_ID.txt', 'r') as file:
+        data=json.load(file)
+    load_fromfile_modelslugs.ftract=data
+    load_fromfile_modelslugs.hbr=True
+    return load_fromfile_censustractID.ftract       
+
     
-## Available Functions
-def load_tractID():
-    load_tractID.has_been_called=True
-    
+## Available Functions    
 def get_tractID(tract_number):
-    return ftract[tract_number]
+    tract=str(tract_number)
+    try:
+        return get_tractID.ftract[tract]
+    except:
+        try:
+            get_tractID.ftract=load_fromfile_censustractID()
+        except:
+            get_tractID.ftract=api_pull_censustractID(True)
+    return get_tractID.ftract[tract]
+
+
+
 def daily_ct(model_slug,tract_number):
     url = f'http://api.cal-adapt.org/api/series/{model_slug}/events'
-    params = {'ref': f"/api/censustracts/{ftract[tract_number]}/", 'stat':'mean'}
+    params = {'ref': f"/api/censustracts/{get_tractID(tract_number)}/", 'stat':'mean'}
     headers = {'ContentType': 'json'}
     response = requests.get(url, params=params, headers=headers)
     r=response.json()
@@ -65,7 +80,7 @@ def daily_ct(model_slug,tract_number):
 def daily_ct_timerange(model_slug,tract_number,begin,end):
     begin_time=pd.to_datetime(begin)
     end_time=pd.to_datetime(end)
-    whole_data=daily_ct_temp(model_slug,tract_number)
+    whole_data=daily_ct(model_slug,tract_number)
     return whole_data.loc[begin_time:end_time]
 
 def daily_ct_year(model_slug,tract_number,year):
